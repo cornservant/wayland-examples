@@ -2,7 +2,7 @@ use std::{convert::TryInto, time::Duration};
 
 use smithay_client_toolkit::activation::RequestData;
 use smithay_client_toolkit::dispatch2::Dispatch2;
-use smithay_client_toolkit::globals::{GlobalData};
+use smithay_client_toolkit::globals::GlobalData;
 use smithay_client_toolkit::reexports::calloop::{EventLoop, LoopHandle};
 use smithay_client_toolkit::reexports::calloop_wayland_source::WaylandSource;
 use smithay_client_toolkit::{
@@ -13,31 +13,31 @@ use smithay_client_toolkit::{
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
     seat::{
+        Capability, SeatHandler, SeatState,
         keyboard::{KeyEvent, KeyboardHandler, Keysym, Modifiers, RawModifiers},
         pointer::{PointerEvent, PointerEventKind, PointerHandler},
-        Capability, SeatHandler, SeatState,
     },
     shell::{
-        xdg::{
-            window::{Window, WindowConfigure, WindowDecorations, WindowHandler},
-            XdgShell,
-        },
         WaylandSurface,
+        xdg::{
+            XdgShell,
+            window::{Window, WindowConfigure, WindowDecorations, WindowHandler},
+        },
     },
     shm::{
-        slot::{Buffer, SlotPool},
         Shm, ShmHandler,
+        slot::{Buffer, SlotPool},
     },
 };
 use wayland_client::{
+    Connection, QueueHandle,
     globals::registry_queue_init,
     protocol::{wl_keyboard, wl_output, wl_pointer, wl_seat, wl_shm, wl_surface},
-    Connection, QueueHandle,
 };
 use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel};
 
 fn main() {
-    env_logger::init();
+    tracing_subscriber::fmt::init();
 
     // All Wayland apps start by connecting the compositor (server).
     let conn = Connection::connect_to_env().unwrap();
@@ -48,7 +48,9 @@ fn main() {
     let mut event_loop: EventLoop<SimpleWindow> =
         EventLoop::try_new().expect("Failed to initialize the event loop!");
     let loop_handle = event_loop.handle();
-    WaylandSource::new(conn.clone(), event_queue).insert(loop_handle).unwrap();
+    WaylandSource::new(conn.clone(), event_queue)
+        .insert(loop_handle)
+        .unwrap();
 
     // The compositor (not to be confused with the server which is commonly called the compositor) allows
     // configuring surfaces to be presented.
@@ -63,10 +65,12 @@ fn main() {
 
     // A window is created from a surface.
     let surface = compositor.create_surface(&qh);
-    let xdg_surface = xdg_shell.xdg_wm_base().get_xdg_surface(&surface, &qh, GlobalData);
-    let _xdg_toplevel = xdg_surface.get_toplevel(&qh, GlobalData);
+    let xdg_surface = xdg_shell
+        .xdg_wm_base()
+        .get_xdg_surface(&surface, &qh, GlobalData);
     // And then we can create the window.
     let window = xdg_shell.create_window(surface, WindowDecorations::RequestServer, &qh);
+    let _xdg_toplevel = xdg_surface.get_toplevel(&qh, GlobalData);
     // Configure the window, this may include hints to the compositor about the desired minimum size of the
     // window, app id for WM identification, the window title, etc.
     window.set_title("A wayland window");
@@ -88,7 +92,9 @@ fn main() {
             RequestData {
                 seat_and_serial: None,
                 surface: Some(window.wl_surface().clone()),
-                app_id: Some(String::from("io.github.smithay.client-toolkit.SimpleWindow")),
+                app_id: Some(String::from(
+                    "io.github.smithay.client-toolkit.SimpleWindow",
+                )),
                 udata: (),
             },
         )
@@ -123,7 +129,9 @@ fn main() {
 
     // We don't draw immediately, the configure will notify us when to first draw.
     loop {
-        event_loop.dispatch(Duration::from_millis(16), &mut simple_window).unwrap();
+        event_loop
+            .dispatch(Duration::from_millis(16), &mut simple_window)
+            .unwrap();
 
         if simple_window.exit {
             println!("exiting example");
@@ -152,7 +160,6 @@ struct SimpleWindow {
     pointer: Option<wl_pointer::WlPointer>,
     loop_handle: LoopHandle<'static, SimpleWindow>,
 }
-
 
 impl Dispatch2<xdg_surface::XdgSurface, SimpleWindow> for GlobalData {
     fn event(
@@ -331,7 +338,10 @@ impl SeatHandler for SimpleWindow {
 
         if capability == Capability::Pointer && self.pointer.is_none() {
             println!("Set pointer capability");
-            let pointer = self.seat_state.get_pointer(qh, &seat).expect("Failed to create pointer");
+            let pointer = self
+                .seat_state
+                .get_pointer(qh, &seat)
+                .expect("Failed to create pointer");
             self.pointer = Some(pointer);
         }
     }
@@ -465,7 +475,11 @@ impl PointerHandler for SimpleWindow {
                 Release { button, .. } => {
                     println!("Release {:x} @ {:?}", button, event.position);
                 }
-                Axis { horizontal, vertical, .. } => {
+                Axis {
+                    horizontal,
+                    vertical,
+                    ..
+                } => {
                     println!("Scroll H:{horizontal:?}, V:{vertical:?}");
                 }
             }
@@ -487,7 +501,12 @@ impl SimpleWindow {
 
         let buffer = self.buffer.get_or_insert_with(|| {
             self.pool
-                .create_buffer(width as i32, height as i32, stride, wl_shm::Format::Argb8888)
+                .create_buffer(
+                    width as i32,
+                    height as i32,
+                    stride,
+                    wl_shm::Format::Argb8888,
+                )
                 .expect("create buffer")
                 .0
         });
@@ -514,19 +533,22 @@ impl SimpleWindow {
         // Draw to the window:
         {
             let shift = self.shift.unwrap_or(0);
-            canvas.chunks_exact_mut(4).enumerate().for_each(|(index, chunk)| {
-                let x = ((index + shift as usize) % width as usize) as u32;
-                let y = (index / width as usize) as u32;
+            canvas
+                .chunks_exact_mut(4)
+                .enumerate()
+                .for_each(|(index, chunk)| {
+                    let x = ((index + shift as usize) % width as usize) as u32;
+                    let y = (index / width as usize) as u32;
 
-                let a = 0xFF;
-                let r = u32::min(((width - x) * 0xFF) / width, ((height - y) * 0xFF) / height);
-                let g = u32::min((x * 0xFF) / width, ((height - y) * 0xFF) / height);
-                let b = u32::min(((width - x) * 0xFF) / width, (y * 0xFF) / height);
-                let color = (a << 24) + (r << 16) + (g << 8) + b;
+                    let a = 0xFF;
+                    let r = u32::min(((width - x) * 0xFF) / width, ((height - y) * 0xFF) / height);
+                    let g = u32::min((x * 0xFF) / width, ((height - y) * 0xFF) / height);
+                    let b = u32::min(((width - x) * 0xFF) / width, (y * 0xFF) / height);
+                    let color = (a << 24) + (r << 16) + (g << 8) + b;
 
-                let array: &mut [u8; 4] = chunk.try_into().unwrap();
-                *array = color.to_le_bytes();
-            });
+                    let array: &mut [u8; 4] = chunk.try_into().unwrap();
+                    *array = color.to_le_bytes();
+                });
 
             if let Some(shift) = &mut self.shift {
                 *shift = (*shift + 1) % width;
@@ -534,13 +556,19 @@ impl SimpleWindow {
         }
 
         // Damage the entire window
-        self.window.wl_surface().damage_buffer(0, 0, self.width as i32, self.height as i32);
+        self.window
+            .wl_surface()
+            .damage_buffer(0, 0, self.width as i32, self.height as i32);
 
         // Request our next frame
-        self.window.wl_surface().frame(qh, FrameCallbackData(self.window.wl_surface().clone()));
+        self.window
+            .wl_surface()
+            .frame(qh, FrameCallbackData(self.window.wl_surface().clone()));
 
         // Attach and commit to present.
-        buffer.attach_to(self.window.wl_surface()).expect("buffer attach");
+        buffer
+            .attach_to(self.window.wl_surface())
+            .expect("buffer attach");
         self.window.commit();
     }
 }
