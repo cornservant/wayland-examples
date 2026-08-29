@@ -39,6 +39,8 @@ use wayland_protocols::xdg::toplevel_tag::v1::client::xdg_toplevel_tag_manager_v
     self, XdgToplevelTagManagerV1,
 };
 
+// FIXME: This crashes sometimes when fighting with (for instance) noctalia shell for an exclusive zone.
+
 fn main() {
     tracing_subscriber::fmt::init();
 
