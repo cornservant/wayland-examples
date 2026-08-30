@@ -248,8 +248,16 @@ impl CompositorHandler for SimpleWindow {
         conn: &Connection,
         qh: &QueueHandle<Self>,
         _surface: &wl_surface::WlSurface,
-        _time: u32,
+        time: u32,
     ) {
+        tracing::info!("time % 3000 (time): {}   ({})", time % 3000, time);
+        if time % 3000 < 1500 {
+            self.xdg_toplevel_tag
+                .set_tag(self.window.xdg_toplevel(), "foo".to_string());
+        } else {
+            self.xdg_toplevel_tag
+                .set_tag(self.window.xdg_toplevel(), "not foo".to_string());
+        }
         self.draw(conn, qh);
     }
 
